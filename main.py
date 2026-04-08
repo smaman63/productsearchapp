@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -12,17 +13,31 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Load correct sheet (you already fixed this part)
-df = pd.read_excel("products.xlsx", sheet_name="Saleable")
+# ✅ Load Excel (both sheets)
+df_saleable = pd.read_excel("products.xlsx", sheet_name="Saleable")
+df_non = pd.read_excel("products.xlsx", sheet_name="Non Saleable")
 
-# Clean columns
-df.columns = df.columns.str.strip()
+# ✅ Clean + add sheet type
+def prepare_df(df, label):
+    df.columns = df.columns.str.strip()
+    df = df.fillna("")
+    df["sheet_type"] = label
+    return df
 
-# ✅ FIX NAN ISSUE
-df = df.fillna("")
+df_saleable = prepare_df(df_saleable, "Saleable")
+df_non = prepare_df(df_non, "Non Saleable")
+
+# ✅ Combine
+df = pd.concat([df_saleable, df_non], ignore_index=True)
 
 print("Columns:", df.columns.tolist())
 
+# ✅ Root (for testing)
+@app.get("/")
+def home():
+    return {"message": "API is working 🚀"}
+
+# ✅ Search API
 @app.get("/search")
 def search_products(q: str = Query("")):
     if not q:
@@ -34,7 +49,6 @@ def search_products(q: str = Query("")):
         df['UPC'].astype(str).str.contains(q, case=False, na=False)
     ].head(50)
 
-    # ✅ EXTRA SAFETY (recommended)
     result = result.fillna("")
 
     return result.to_dict(orient="records")
